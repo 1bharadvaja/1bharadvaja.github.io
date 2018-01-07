@@ -1,0 +1,101 @@
+ [
+  {
+  "type":"landmark",
+  "landmark_name":"Statue of Liberty",
+  "city":"New York City",
+  "category":"statue",
+  "fact":"A gift to the United States from the people of France.",
+  "location":{
+  "latitude":40.689244,
+  "longitude":-74.044514
+  }
+  },
+  {
+  "type":"landmark",
+  "landmark_name":"Empire State Building",
+  "city":"New York City",
+  "category":"skyscraper",
+  "fact":"Was once the tallest building in the world",
+  "location":{
+  "latitude":40.7484
+  "longitude":-73.9857
+  }
+  },
+  {
+  "type":"landmark",
+  "landmark_name":"Golden Gate Bridge",
+  "city":"San Francisco",
+  "category":"bridge",
+  "fact":"There are approximately 600,000 rivets in each tower.",
+  "location":{
+  "latitude":37.821257,
+  "longitude":-122.478787
+  }
+  },
+  {
+  "type":"landmark",
+  "landmark_name":"Spirit of Detroit",
+  "city":"Detroit",
+  "category":"statue",
+  "fact":"It was commissioned in 1955 for a cost of $58,000.",
+  "location":{
+  "latitude":42.3293,
+  "longitude":-83.0446
+  }
+  },
+  {
+  "type":"landmark",
+  "landmark_name":"Ambassador Bridge",
+  "city":"Detroit",
+  "category":"bridge",
+  "fact":"The bridge carries approximately 25% of trade between Canada and the United States.",
+  "location":{
+  "latitude":42.3119,
+  "longitude":-83.0741
+  }
+  },
+  {
+  "type":"landmark",
+  "landmark_name":"Renaissance Center",
+  "city":"Detroit",
+  "category":"skyscraper",
+  "fact":"The first tower of the Renaissance Center opened on July 1, 1976.",
+  "location":{
+  "latitude":42.3290,
+  "longitude":-83.0397
+  }
+  },
+  {
+  "type":"landmark",
+  "landmark_name":"Mount Rushmore",
+  "city":"Keystone",
+  "category":"statue",
+  "fact":"The memorial was iconically used as the location of the climactic chase scene in Alfred Hitchcock's 1959 movie North by Northwest.",
+  "location":{
+  "latitude":43.8789,
+  "longitude":-103.4598
+  }
+  },
+  {
+  "type":"landmark",
+  "landmark_name":"CN Tower",
+  "city":"Toronto",
+  "category":"skyscraper",
+  "fact":"The idea of the CN Tower originated in 1968 when the Canadian National Railway had a desire to build a large TV and radio communication platform to serve the Toronto area.",
+  "location":{
+  "latitude":43.6426,
+  "longitude":-79.3871
+  }
+  },
+  {
+  "type":"landmark",
+  "landmark_name":"Casa Loma",
+  "city":"Toronto",
+  "category":"residence",
+  "fact":"It was originally a residence for financier Sir Henry Mill Pellatt.",
+  "location":{
+  "latitude":43.6780,
+  "longitude":-79.4094
+  }
+  }
+  ]
