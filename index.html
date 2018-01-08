@@ -8,7 +8,13 @@
 <meta name=viewport content="width=device-width, initial-scale=1.0, minimum-scale=0.5 maximum-scale=1.0">
 <h1>Download GeoApp</h1>
 <p>Introducing GeoApp, an app that helps you study for the Geography Bee.</p>
-<a href="GeoApp.ipa" download>
-    <button type="button" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent">Download GeoApp</button>
-</a>
+<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+<iframe id="my_iframe" style="display:none;"></iframe>
+<script>
+    function download() {
+        document.getElementById('my_iframe').src = "https://github.com/themartian117/themartian117.github.io/releases/tag/1.0"</script>
+};
+</script>
+<button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" id="bottom" onclick="download()">Download GeoApp</button>
+<p>Just click the "Download" button to get GeoApp</p>
 </html>
