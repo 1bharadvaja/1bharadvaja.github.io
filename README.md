@@ -1,3 +1,2 @@
 # themartian117.github.io
-My vebsite
-Lots of cool stuff is on my website. CrytpoChat, and Swift for beginners
+I will talk about interesting topics like Physics, problem solving, and more.
