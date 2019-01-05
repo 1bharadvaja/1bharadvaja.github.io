@@ -66,13 +66,14 @@
 <p>This gives you the answer of $\ln|e + \sqrt{e^{2}-1}|$. And the problem is solved!
 <br>
  <h2>Second Problem</h2>
-<p>A spherical shell of uniform charge density σ has a circular hole cut out of it as shown below:
-What is the Electric Field at a radius just outside the sphere, directly over the center of the circular, cut-out hole?
-HINT: the hole is small enough that you can treat it as flat, and the point at which you are calculating the field is so close to the hole that it can be approximated as an infinite plane. <p>
-
+<p>Prove the relationship between Gauss's Law for electricity and Coulomb's Law.</p>
 <h3>Answer</h3>
-The answer
-
+<p>Okay, so this proof is fairly straight forward. Gauss's Law states that $\epsilon_{0}\int\vec{E}\cdot{\mathrm{d}A} = q_{enc}$, while Coulombs Law states $E = \frac{1}{4\pi\epsilon_{0}} \frac{q_{1}}{r^{2}}$.<p>
+<p>Gauss's law conceptually states that the net electric flux is proportional to the net electrical charge by a constant of proportionality of $\frac {1}{\epsilon_{0}}$, while Coulomb's Law conceptually states that electric force and electric field strength are inversely proportional to $r^{2}$.</p>
+<p>Now we can go about proving the relationship.</p>
+<p>$\epsilon_{0}\int\vec{E}\cdot{\mathrm{d}A} = q_{enc}$. We can take out the electric field vector $\vec{E}$, because it is the same regardless of where it is on the surface.
+    Now our integral is $\epsilon_{0}E\int{\mathrm{d}A}. Now the integral is simply the sum of all the differntials of the sphere, which happens to be the surface area, or $4\pi r^{2}$.
+    This gives us the equation $\epsilon_{0}E(4\pi r^{2}) = q_{enc}$. Some rearranging gives us the formula $E = \frac{q_{enc}}{4\pi r^{2}\epsilon_{0}}$, and the relationship is thus proved.</p>
 
 
 
