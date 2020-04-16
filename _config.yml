@@ -1,1 +1,11 @@
 theme: thelehhman/plainwhite-jekyll
+
+plainwhite:
+  name: Ani Bharadwaj
+  tagline: Developer
+  date_format: "%b %-d, %Y"
+
+  social_links:
+    #twitter: thelehhman
+    github: themartian117
+    #linkedIn: in/thelehhman # format: locale/username
