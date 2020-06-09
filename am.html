@@ -1,9 +1,28 @@
-<!DOCTYPE>
+<!DOCTYPE html>
 <html>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.blue-light_blue.min.css" /> 
-    <link rel = "icon" href = "favico.ico" type = "image/x-icon">
+<head>
+  <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+  <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+<link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.green-blue.min.css" />
 <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+
+<style>
+
+.active {
+  display: block;
+  display: initial;
+}
+
+.inactive {
+  display: none;
+}
+
+
+</style>
+
+
+
 <style>
                     body {
                         margin: 2.5%;
@@ -20,27 +39,94 @@
                     font-family: "Sawasdee", Verdana, Tahoma
                     text-shadow: 3px 3px 3px #aaa;
                 }
-</style>
-<section id="dynamic-demo-toolbar">
-  <nav id="dynamic-tab-bar" class="mdc-tab-bar" role="tablist">
-    <a role="tab" aria-controls="panel-1"
-       class="mdc-tab mdc-tab--active" href="#panel-1">Home</a>
-    <a role="tab" aria-controls="panel-2"
-       class="mdc-tab" href="#panel-2">Bishop Ranch</a>
-    <a role="tab" aria-controls="panel-3"
-       class="mdc-tab" href="#panel-3">Others</a>
-    <span class="mdc-tab-bar__indicator"></span>
-  </nav>
-</section>
-<section>
-  <div class="panels">
-    <p class="panel active" id="panel-1" role="tabpanel" aria-hidden="false">Item One</p>
-    <p class="panel" id="panel-2" role="tabpanel" aria-hidden="true">Item Two</p>
-    <p class="panel" id="panel-3" role="tabpanel" aria-hidden="true">Item Three</p>
-  </div>
-  <div class="dots">
-    <a class="dot active" data-trigger="panel-1" href="#panel-1"></a>
-    <a class="dot" data-trigger="panel-2" href="#panel-2"></a>
-    <a class="dot" data-trigger="panel-3" href="#panel-3"></a>
-  </div>
-</section>
+                </style>
+
+
+</head>
+
+<div>
+<center><h1>Keep San Ramon Natural!</h1></center>
+<body>
+
+<p>As part of an outreach initiative by Aparna Madireddi, a candidate for San Ramon Mayor in the upcoming November Elections,
+we have put together a website to show how you can help San Ramon maintain its uniqueness, and beauty. This website is for creating
+awareness within the community about projects that are going on that may ruin the natural beaty of San Ramon, and change its open space environment that we have come to 
+love.</p>
+<center>
+<p>Learn more about the issues that San Ramon faces today by clicking the buttons below.</p>
+</center>
+</div>
+
+
+
+
+<div class="mdc-tab-bar" role="tablist" aria-label="Navigation">
+            <div class="mdc-tab-scroller">
+              <div class="mdc-tab-scroller__scroll-area">
+                <div class="mdc-tab-scroller__scroll-content">
+                  <button class="mdc-tab mdc-tab--stacked" role="tab" aria-selected="true" tabindex="-1">
+                    <span class="mdc-tab__content">
+                      <span class="mdc-tab__icon material-icons">access_time</span>
+                      <span class="mdc-tab__text-label">Bishop Ranch</span>
+                    </span>
+                    <span class="mdc-tab-indicator">
+                      <span class="mdc-tab-indicator__content mdc-tab-indicator__content--underline"></span>
+                    </span>
+                    <span class="mdc-tab__ripple"></span>
+                  </button>
+                  <button class="mdc-tab mdc-tab--stacked" role="tab" aria-selected="false" tabindex="1">
+                    <span class="mdc-tab__content">
+                      <span class="mdc-tab__icon material-icons">near_me</span>
+                      <span class="mdc-tab__text-label">Other Stuff</span>
+                    </span>
+                    <span class="mdc-tab-indicator mdc-tab-indicator--active">
+                      <span class="mdc-tab-indicator__content mdc-tab-indicator__content--underline"></span>
+                    </span>
+                    <span class="mdc-tab__ripple"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+
+
+<script>
+var elements = document.getElementsByClassName("mdc-tab mdc-tab--stacked");
+var contents = document.getElementsByClassName("content");
+
+for(i=0; i < elements.length; i++) {
+    elements[i].addEventListener("click", myhandler);
+}
+function myhandler(e) {
+    for(i=0; i < contents.length; i++) {
+        current = contents[i];
+        if(current.id == "content-" + e.target.id) {
+            console.log("content-" + e.target.id);
+            current.classList.add("active");
+            current.classList.remove("inactive");
+        } else {
+            current.classList.remove("active");
+            current.classList.add("inactive");
+        }
+    }
+}
+</script>
+
+
+
+<div class = "content" id = "content-1">
+	<h3>Bishop Ranch Project</h3>
+</div>
+
+<div class = "content inactive" id = "content-2">
+	<h3>Other</h3>
+</div>
+
+
+
+<script>
+[].forEach.call(document.querySelectorAll('.mdc-tab-bar'), function(el) {
+  mdc.tabBar.MDCTabBar.attachTo(el);
+});
+</script>
