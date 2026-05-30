@@ -4,394 +4,241 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Optimizing a Conv2D Kernel on AWS Trainium</title>
-<meta name="description" content="Taking a Trainium NKI Conv2D kernel from a 4360µs baseline down to sub-400µs-per-case leaderboard territory.">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
-
 <style>
-:root{
-  --ink:#1b1a18;
-  --paper:#fbfaf7;
-  --muted:#6f6a61;
-  --rule:#e6e1d6;
-  --link:#6b3a2e;
-  --code-bg:#20242b;
-  --code-fg:#dfe3e8;
-  --code-dim:#8b95a1;
-  --code-key:#cf9a6f;
-  --code-str:#9fc18d;
-  --code-num:#d9bd6a;
-  --code-fn:#86acca;
-  --code-dec:#bb96cd;
-  --maxw:640px;
-}
-
-*{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{
-  margin:0;
-  background:var(--paper);
-  color:var(--ink);
-  font-family:"Source Serif 4", Georgia, "Times New Roman", serif;
-  font-size:19px;
-  line-height:1.66;
-  -webkit-font-smoothing:antialiased;
-}
-
-.wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
-
-header.site{
-  display:flex;align-items:center;
-  max-width:var(--maxw);margin:0 auto;padding:28px 22px 0;
-  font-family:"JetBrains Mono", ui-monospace, Menlo, monospace;
-  font-size:13px;
-}
-header.site a{color:var(--muted);text-decoration:none}
-header.site a:hover{color:var(--link)}
-header.site .spacer{flex:1}
-
-article{padding:30px 0 80px}
-
-h1.title{
-  font-size:33px;line-height:1.18;font-weight:600;
-  margin:0 0 12px;letter-spacing:-0.012em;
-}
-.meta{
-  font-family:"JetBrains Mono", ui-monospace, monospace;
-  font-size:12.5px;color:var(--muted);margin:0 0 30px;
-  padding-bottom:26px;border-bottom:1px solid var(--rule);
-}
-
-h2{font-size:23px;font-weight:600;margin:46px 0 0;letter-spacing:-0.01em}
-h3{font-size:19px;font-weight:600;margin:30px 0 0}
-
-p{margin:17px 0}
-a{color:var(--link);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:.5px}
-strong{font-weight:600}
-
-/* inline code */
-code{
-  font-family:"JetBrains Mono", ui-monospace, Menlo, monospace;
-  font-size:0.8em;
-  background:#efebe1;
-  border-radius:4px;
-  padding:1px 5px;
-  color:#4a443c;
-}
-
-/* code blocks */
-.code{
-  margin:24px 0;
-  border-radius:10px;
-  overflow:hidden;
-  background:var(--code-bg);
-  box-shadow:0 1px 2px rgba(0,0,0,.06), 0 14px 34px -22px rgba(20,24,30,.55);
-}
-.code .bar{
-  display:flex;align-items:center;gap:7px;
-  padding:9px 14px 8px;
-  border-bottom:1px solid rgba(255,255,255,.06);
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;letter-spacing:.06em;color:var(--code-dim);
-}
-.code .bar i{width:10px;height:10px;border-radius:50%;display:inline-block;opacity:.55}
-.code .bar i.a{background:#e0695f}
-.code .bar i.b{background:#e7b84e}
-.code .bar i.c{background:#69b56b}
-.code .bar .label{margin-left:8px;text-transform:lowercase}
-.code pre{
-  margin:0;padding:15px 16px;overflow-x:auto;color:var(--code-fg);
-  font-family:"JetBrains Mono", ui-monospace, Menlo, monospace;
-  font-size:13px;line-height:1.65;
-}
-.code pre code{background:none;border:0;padding:0;font-size:inherit;color:inherit}
-
-.tok-k{color:var(--code-key)}
-.tok-s{color:var(--code-str)}
-.tok-n{color:var(--code-num)}
-.tok-f{color:var(--code-fn)}
-.tok-c{color:var(--code-dim);font-style:italic}
-.tok-d{color:var(--code-dec)}
-
-/* tables */
-.tbl{margin:26px 0;overflow-x:auto}
-table{border-collapse:collapse;width:100%;
-  font-family:"JetBrains Mono", monospace;font-size:13.5px}
-th,td{padding:7px 12px;text-align:left;border-bottom:1px solid var(--rule)}
-th{font-weight:600;font-size:11px;letter-spacing:.04em;
-  text-transform:uppercase;color:var(--muted)}
-td.r,th.r{text-align:right}
-tr:last-child td{border-bottom:0}
-td .win{color:#3a7d56}
-td .big{color:var(--link);font-weight:700}
-
-ul,ol{margin:16px 0;padding-left:22px}
-li{margin:9px 0}
-li::marker{color:var(--muted)}
-
-blockquote{margin:22px 0;padding:2px 0 2px 18px;border-left:2px solid var(--rule);
-  color:var(--muted);font-style:italic}
-
-.foot{
-  margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);
-  font-family:"JetBrains Mono", monospace;font-size:12.5px;color:var(--muted);
-}
-.foot a{color:var(--muted)}
-
-@media (max-width:560px){
-  body{font-size:18px}
-  h1.title{font-size:28px}
-  h2{font-size:21px}
-}
-@media print{
-  header.site,.foot{display:none}
-  body{background:#fff}
-  .code{box-shadow:none}
-}
+  body{
+    max-width:720px;
+    margin:0 auto;
+    padding:0 20px 80px;
+    font-family:Georgia, "Times New Roman", serif;
+    font-size:18px;
+    line-height:1.6;
+    color:#222;
+    background:#fff;
+  }
+  header.site{padding:24px 0 0;font-size:14px}
+  header.site a{color:#666;text-decoration:none}
+  header.site a:hover{text-decoration:underline}
+  h1{font-size:28px;line-height:1.25;margin:28px 0 6px}
+  .meta{font-size:14px;color:#777;margin:0 0 28px}
+  h2{font-size:21px;margin:40px 0 0}
+  h3{font-size:17px;margin:26px 0 0}
+  p{margin:15px 0}
+  a{color:#1a5fb4}
+  code{font-family:Menlo, Consolas, monospace;font-size:14px;background:#f2f2f2;padding:1px 4px;border-radius:3px}
+  pre{
+    background:#f6f6f6;
+    border:1px solid #e2e2e2;
+    border-radius:4px;
+    padding:12px 14px;
+    overflow-x:auto;
+    font-family:Menlo, Consolas, monospace;
+    font-size:13.5px;
+    line-height:1.5;
+    margin:20px 0;
+  }
+  pre code{background:none;padding:0;font-size:inherit}
+  table{border-collapse:collapse;font-family:Menlo, Consolas, monospace;font-size:13.5px;margin:20px 0;width:100%}
+  th,td{padding:5px 12px;text-align:left;border-bottom:1px solid #e2e2e2}
+  th{color:#777;font-weight:normal}
+  td.r,th.r{text-align:right}
+  ul{padding-left:22px}
+  li{margin:8px 0}
+  .foot{margin-top:50px;padding-top:18px;border-top:1px solid #e2e2e2;font-size:14px;color:#777}
+  .foot a{color:#777}
 </style>
 </head>
 <body>
 
-<header class="site">
-  <a href="/">← Back</a>
-  <span class="spacer"></span>
-  <a href="https://github.com/1bharadvaja">github</a>
-</header>
+<header class="site"><a href="/">← Back</a></header>
 
-<div class="wrap">
-<article>
+<h1>Optimizing a Conv2D Kernel on AWS Trainium</h1>
+<p class="meta"><time datetime="2026-05-29">May 29, 2026</time> · <span id="readtime">~12 min read</span></p>
 
-  <h1 class="title">Optimizing a Conv2D Kernel on AWS Trainium</h1>
-  <p class="meta"><time datetime="2026-05-29">May 29, 2026</time> · <span id="readtime">~13 min read</span> · NKI / NeuronCore-v2</p>
+<p>The target is a single AWS Trainium 1 chip: one NeuronCore-v2, with a 128×128 systolic Tensor Engine. The job is a 2D convolution written in <a href="https://awsdocs-neuron.readthedocs-hosted.com/en/latest/general/nki/">NKI</a>, AWS's low-level kernel language for Neuron hardware. There's a leaderboard: each test case has a latency threshold, your score is how far under it you land, and there are eleven visible shapes — a mix of <code>float16</code> and <code>float32</code>, filters of 3×3 and 5×5, batch 4 and 16.</p>
 
-  <p>The target is a single AWS Trainium 1 chip: one NeuronCore-v2, with a 128×128 systolic Tensor Engine. The job is a 2D convolution written in <a href="https://awsdocs-neuron.readthedocs-hosted.com/en/latest/general/nki/">NKI</a>, AWS's low-level kernel language for Neuron hardware. There's a leaderboard. Each test case has a latency threshold, your score is how far under it you land, and there are eleven visible shapes: a mix of <code>float16</code> and <code>float32</code>, filters of 3×3 and 5×5, batch 4 and 16.</p>
+<p>I started at a baseline of 4360µs summed across the fleet, with a mean score of 1.7892. The leaderboard top was 1.8427. I ended at 3371µs and 1.8392, which is 989µs shaved and about 93% of the gap closed. Here is what I changed, in two parts: a first round of optimizations that reached a local optimum, then a rewrite plus a precision trick that got past it.</p>
 
-  <p>I started at a cold baseline of 4360µs summed across the fleet, with a mean score of 1.7892. The leaderboard top was 1.8427. I ended at 3371µs and 1.8392, which is 989µs shaved and about 93% of the gap to first place closed. This is the story of those 989 microseconds. It comes in two parts: a first round of "play by the hardware's rules" optimizations that reached a comfortable local optimum, and then a structural rewrite plus a precision trick that broke out of it.</p>
+<h2>Hardware constraints I focused on</h2>
 
-  <h2>The hardware has opinions</h2>
+<p>Trainium isn't a GPU, and three of its constraints shaped most of the work:</p>
 
-  <p>Trainium is not a GPU and it will not forgive you for pretending it is. Three constraints shaped every decision:</p>
+<ul>
+  <li><strong>DMA contiguity.</strong> When you <code>nl.load</code> a tile from HBM, every dimension except the first has to be contiguous in memory. If it isn't, the compiler doesn't error — it silently emits thousands of scalar loads and you hit a hard latency floor.</li>
+  <li><strong>Eight PSUM banks.</strong> The accumulator memory has exactly eight banks per core. Ask for sixteen and you get <code>PSUM8 — allocated memory out of bound</code>. This limits how many matmul accumulators can be live at once, which limits pipelining.</li>
+  <li><strong>A scalar processor that stalls the matrix pipeline.</strong> Integer division and modulo run on a slow scalar unit. In an inner loop they stall the Tensor Engine for microseconds at a time.</li>
+</ul>
 
-  <ul>
-    <li><strong>DMA contiguity.</strong> When you <code>nl.load</code> a tile from HBM, every dimension except the first has to form a contiguous buffer in memory. Break this and the compiler doesn't error. It silently emits thousands of scalar loads, and you eat a hard latency floor.</li>
-    <li><strong>Eight PSUM banks.</strong> The accumulator memory has exactly eight banks per core. Ask for sixteen and you get <code>PSUM8 — allocated memory out of bound</code>. This caps how many matmul accumulators can be live at once, which caps how well you can pipeline.</li>
-    <li><strong>A scalar processor that stalls the matrix pipeline.</strong> Integer division and modulo run on a slow scalar unit. Put them in an inner loop and they stall the Tensor Engine for microseconds at a time.</li>
-  </ul>
+<p>Most of what follows is hitting one of these and rearranging the kernel to avoid it.</p>
 
-  <p>Almost everything below is some version of tripping one of these rules and then rearranging the kernel to stop.</p>
+<h2>First attempt</h2>
 
-  <h2>Part one: playing by the rules</h2>
+<h3>Load the weights once</h3>
 
-  <h3>Load the weights once, globally</h3>
+<p>The intuitive thing is to load each weight tile right before you use it. On Trainium that forces the input tensor <code>X</code> to be re-read from HBM on every weight pass. Bulk-loading all the weights into SBUF (the on-chip scratchpad) at the start means <code>X</code> is streamed exactly once per compute block. The early bottleneck was HBM bandwidth, not compute, so this was the biggest single lever.</p>
 
-  <p>The intuitive thing is to load each weight tile right before you use it. On Trainium that forces the large input tensor <code>X</code> to be re-read from HBM on every weight pass. Bulk-hoisting all the weights into SBUF (the on-chip scratchpad) at the very top means <code>X</code> gets streamed exactly once per compute block. The early bottleneck was HBM bandwidth, not compute, so this is the single biggest lever on it.</p>
+<h3>The 128-loop that avoids a silent transpose</h3>
 
-  <h3>The 128-loop that dodges a silent transpose</h3>
+<p>I wanted the weights laid out transposed in SBUF, and the natural move is to let a 2D DMA mapping do the transpose. The compiler accepted it, then emitted 6,400 scalar load instructions and pinned me to a ~600µs floor — the DMA engine won't treat a non-contiguous free dimension as a bulk transfer. The fix was to pull contiguous 3D strips with an explicit loop and scatter them into the stationary tiles by hand.</p>
 
-  <p>I wanted the weights laid out transposed in SBUF, and the natural move is to let a 2D DMA mapping do the transpose implicitly. The compiler accepted it, then quietly emitted 6,400 scalar load instructions and pinned me to a ~600µs floor. The DMA engine won't treat a non-contiguous free dimension as a bulk transfer.</p>
-
-  <p>The fix was to stop being clever: pull contiguous 3D strips with an explicit loop and scatter them into the stationary tiles by hand.</p>
-
-  <div class="code">
-    <div class="bar"><i class="a"></i><i class="b"></i><i class="c"></i><span class="label">weight load</span></div>
-<pre><code><span class="tok-c"># contiguous 3D strips [128 channels, H, W], scattered manually</span>
-<span class="tok-k">for</span> om <span class="tok-k">in</span> nl.<span class="tok-f">static_range</span>(<span class="tok-n">128</span>):
-    w_strip = nl.<span class="tok-f">load</span>(W[oct_*OC + om, ict*P + w_k, w_h, w_w])
-    <span class="tok-k">for</span> kh, kw:
+<pre><code># contiguous 3D strips [128 channels, H, W], scattered manually
+for om in nl.static_range(128):
+    w_strip = nl.load(W[oct_*OC + om, ict*P + w_k, w_h, w_w])
+    for kh, kw:
         weight_tiles_ci[kh][kw][k_i, om + k_j] = w_strip[k_i, kh, kw + k_j]</code></pre>
-  </div>
 
-  <p>Ugly, but it stays on the bulk DMA path. Part two deletes it entirely for something much better.</p>
+<p>Ugly, but it stays on the bulk DMA path. The rewrite below replaces it.</p>
 
-  <h3>Cache the view, slice once</h3>
+<h3>Cache the view, slice once</h3>
 
-  <p>For the 256-output-channel cases the kernel computes two output tiles at once. I'd been slicing the moving input view twice, once per accumulator. Caching the slice into a local and feeding both accumulators halved the NKI tracer's slicing overhead.</p>
+<p>For the 256-output-channel cases the kernel computes two output tiles at once. I had been slicing the moving input view twice, once per accumulator. Caching the slice into a local and feeding both accumulators halved the slicing overhead.</p>
 
-  <div class="code">
-    <div class="bar"><i class="a"></i><i class="b"></i><i class="c"></i><span class="label">view caching</span></div>
-<pre><code>v0 = row_block[v_c, v_r, v_w + kw]   <span class="tok-c"># slice once...</span>
-acc0 += nisa.<span class="tok-f">nc_matmul</span>(w0, v0)        <span class="tok-c"># ...reuse for both OC tiles</span>
-acc1 += nisa.<span class="tok-f">nc_matmul</span>(w1, v0)</code></pre>
-  </div>
+<pre><code>v0 = row_block[v_c, v_r, v_w + kw]   # slice once...
+acc0 += nisa.nc_matmul(w0, v0)        # ...reuse for both OC tiles
+acc1 += nisa.nc_matmul(w1, v0)</code></pre>
 
-  <p>Relatedly, loading the exact row block each filter row needs makes a width shift by <code>kw</code> a zero-cost pointer offset instead of a strided gather that triggers a hidden <code>tensor_copy</code>.</p>
+<p>Loading the exact row block each filter row needs also makes a width shift by <code>kw</code> a simple pointer offset instead of a strided gather that triggers a hidden <code>tensor_copy</code>.</p>
 
-  <h3>Unroll the 3×3, and stop dividing</h3>
+<h3>Unroll the 3×3, and stop dividing</h3>
 
-  <p>Two instruction-level wins. For the hot 3×3 cases I deleted the <code>kh</code>/<code>kw</code> loops and emitted nine explicit <code>nc_matmul</code> calls, which removes loop-control latency in favor of a flat block of matrix math.</p>
+<p>Two instruction-level changes. For the hot 3×3 cases I deleted the <code>kh</code>/<code>kw</code> loops and wrote out nine explicit <code>nc_matmul</code> calls, which removes loop-control latency.</p>
 
-  <p>The second one is less obvious. I'd tried flattening batch and spatial dims into one 1D loop and recovering the indices with <code>//</code> and <code>%</code>. Because the NKI stack allocator forces you to skip the LLVM middle-end, those divisions ran raw on the scalar processor and stalled the matmul pipeline by ~10µs. Plain nested <code>affine_range</code> loops let the hardware's native loop controller take over for free. On this stack the "smart" flattening is slower than the dumb nested loop, because the smartness compiles to scalar arithmetic the matrix engine has to wait on.</p>
+<p>The second one is less obvious. I had flattened the batch and spatial dimensions into one 1D loop and recovered the indices with <code>//</code> and <code>%</code>. Because the NKI stack allocator forces you to skip the LLVM middle-end, those divisions ran on the scalar processor and stalled the matmul pipeline by ~10µs. Plain nested <code>affine_range</code> loops let the hardware's native loop controller handle the indexing instead. So the "smart" flattening was slower than the plain nested loop.</p>
 
-  <p>The decorator stack that holds this together looks wrong on purpose:</p>
+<p>The decorator stack that ties this together is counterintuitive:</p>
 
-  <div class="code">
-    <div class="bar"><i class="a"></i><i class="b"></i><i class="c"></i><span class="label">the kernel contract</span></div>
-<pre><code><span class="tok-d">@ncc.enable_stack_allocator</span>
-<span class="tok-d">@ncc.skip_middle_end_transformations</span>
-<span class="tok-d">@nki.jit</span>
-<span class="tok-k">def</span> <span class="tok-f">conv2d</span>(X, W, bias, ...):
+<pre><code>@ncc.enable_stack_allocator
+@ncc.skip_middle_end_transformations
+@nki.jit
+def conv2d(X, W, bias, ...):
     ...</code></pre>
-  </div>
 
-  <p>Skipping the middle-end optimizer sounds insane until you notice that with manual unrolling and native loops, the AST is already the schedule you want. Letting the optimizer touch it just invited it to software-pipeline the dual accumulators into a PSUM overflow.</p>
+<p>Skipping the middle-end optimizer makes sense once you notice that with manual unrolling and native loops, the AST is already the schedule you want. Letting the optimizer touch it just software-pipelined the dual accumulators into a PSUM overflow. That got me to a local optimum. To move past it I had to replace the weight-loading scheme.</p>
 
-  <p>That got me to a clean local optimum. To actually move past it I had to throw out the weight-loading scheme.</p>
+<h2>The breakthrough</h2>
 
-  <h2>Part two: the unlock</h2>
+<h3>One HBM load instead of 128</h3>
 
-  <h3>One HBM load instead of 128</h3>
+<p>The hand-scattered 128-loop was correct but expensive: 128 separate DMA descriptors, each scattering one strip across 128 output positions. The replacement does a single 4D block load whose last three dimensions cover the whole <code>(ic, fh, fw)</code> sub-cube, so contiguity holds, and then transposes each tap on the Tensor Engine.</p>
 
-  <p>The hand-scattered 128-loop from part one was correct but expensive: 128 separate DMA descriptors, each scattering one strip across 128 output positions. The rewrite, which I called the D2.1 hoist, does a single 4D block load whose last three dimensions cover the entire <code>(ic, fh, fw)</code> sub-cube, so contiguity holds, and then transposes each tap on the Tensor Engine.</p>
+<pre><code>oc_p = nl.arange(TILE_CO)[:, None, None, None]
+ic_f = nl.arange(TILE_CI)[None, :, None, None]
+kh_f = nl.arange(filter_height)[None, None, :, None]
+kw_f = nl.arange(filter_width)[None, None, None, :]
 
-  <div class="code">
-    <div class="bar"><i class="a"></i><i class="b"></i><i class="c"></i><span class="label">D2.1 weight hoist</span></div>
-<pre><code>oc_p = nl.<span class="tok-f">arange</span>(TILE_CO)[:, <span class="tok-k">None</span>, <span class="tok-k">None</span>, <span class="tok-k">None</span>]
-ic_f = nl.<span class="tok-f">arange</span>(TILE_CI)[<span class="tok-k">None</span>, :, <span class="tok-k">None</span>, <span class="tok-k">None</span>]
-kh_f = nl.<span class="tok-f">arange</span>(filter_height)[<span class="tok-k">None</span>, <span class="tok-k">None</span>, :, <span class="tok-k">None</span>]
-kw_f = nl.<span class="tok-f">arange</span>(filter_width)[<span class="tok-k">None</span>, <span class="tok-k">None</span>, <span class="tok-k">None</span>, :]
+# one contiguous 4D block -- par_dim=CO, free=(CI,FH,FW)
+w_block = nl.load(W[co_t*TILE_CO + oc_p, ic_t*TILE_CI + ic_f, kh_f, kw_f])
 
-<span class="tok-c"># one contiguous 4D block -- par_dim=CO, free=(CI,FH,FW)</span>
-w_block = nl.<span class="tok-f">load</span>(W[co_t*TILE_CO + oc_p, ic_t*TILE_CI + ic_f, kh_f, kw_f])
-
-w_buf = nl.<span class="tok-f">ndarray</span>((nl.<span class="tok-f">par_dim</span>(TILE_CI), FH, FW, TILE_CO), dtype=W.dtype, buffer=nl.sbuf)
-<span class="tok-k">for</span> kk <span class="tok-k">in</span> nl.<span class="tok-f">affine_range</span>(FH * FW):    <span class="tok-c"># affine, not static -- avoids unrolling all 9/25 at once</span>
+w_buf = nl.ndarray((nl.par_dim(TILE_CI), FH, FW, TILE_CO), dtype=W.dtype, buffer=nl.sbuf)
+for kk in nl.affine_range(FH * FW):    # affine, not static -- avoids unrolling all 9/25 at once
     kh_s, kw_s = kk // FW, kk % FW
-    wt = nisa.<span class="tok-f">nc_transpose</span>(w_block[:, :, kh_s, kw_s])
-    w_buf[:, kh_s, kw_s, :] = nisa.<span class="tok-f">tensor_copy</span>(wt)</code></pre>
-  </div>
+    wt = nisa.nc_transpose(w_block[:, :, kh_s, kw_s])
+    w_buf[:, kh_s, kw_s, :] = nisa.tensor_copy(wt)</code></pre>
 
-  <p>The nine (or twenty-five) on-chip transposes cost about 0.4µs total, which is nothing next to the DMA serialization they replace. Using <code>affine_range</code> over the taps instead of nested <code>static_range</code> matters: it stops the compiler from unrolling every transpose at once, which had been blowing up PSUM live-ranges.</p>
+<p>The nine (or twenty-five) on-chip transposes cost about 0.4µs total, which is small next to the DMA serialization they replace. Using <code>affine_range</code> over the taps instead of nested <code>static_range</code> matters: it stops the compiler from unrolling every transpose at once, which had been blowing up PSUM live-ranges.</p>
 
-  <p>This one change was worth 874µs across the fleet:</p>
+<p>This one change was worth 874µs across the fleet:</p>
 
-  <div class="tbl">
-  <table>
-    <tr><th>Case</th><th class="r">before</th><th class="r">after</th><th class="r">Δ</th></tr>
-    <tr><td>A · fp32 3×3 b4</td><td class="r">305</td><td class="r">143</td><td class="r"><span class="win">−162</span></td></tr>
-    <tr><td>C · fp32 3×3 b16</td><td class="r">575</td><td class="r">474</td><td class="r"><span class="win">−101</span></td></tr>
-    <tr><td>D · fp32 3×3 ci2</td><td class="r">380</td><td class="r">285</td><td class="r"><span class="win">−95</span></td></tr>
-    <tr><td>E · fp32 5×5</td><td class="r">514</td><td class="r">331</td><td class="r"><span class="win">−183</span></td></tr>
-    <tr><td>G · fp16 5×5 b4</td><td class="r">473</td><td class="r">218</td><td class="r"><span class="win">−255</span></td></tr>
-    <tr><td>H · fp16 5×5 b16</td><td class="r">848</td><td class="r">720</td><td class="r"><span class="win">−128</span></td></tr>
-  </table>
-  </div>
+<table>
+  <tr><th>Case</th><th class="r">before</th><th class="r">after</th><th class="r">Δ</th></tr>
+  <tr><td>A · fp32 3×3 b4</td><td class="r">305</td><td class="r">143</td><td class="r">−162</td></tr>
+  <tr><td>C · fp32 3×3 b16</td><td class="r">575</td><td class="r">474</td><td class="r">−101</td></tr>
+  <tr><td>D · fp32 3×3 ci2</td><td class="r">380</td><td class="r">285</td><td class="r">−95</td></tr>
+  <tr><td>E · fp32 5×5</td><td class="r">514</td><td class="r">331</td><td class="r">−183</td></tr>
+  <tr><td>G · fp16 5×5 b4</td><td class="r">473</td><td class="r">218</td><td class="r">−255</td></tr>
+  <tr><td>H · fp16 5×5 b16</td><td class="r">848</td><td class="r">720</td><td class="r">−128</td></tr>
+</table>
 
-  <h3>Actually using all eight PSUM banks</h3>
+<h3>Using all eight PSUM banks</h3>
 
-  <p>The automatic allocator was effectively using four of the eight PSUM banks. Explicitly placing an 8-deep accumulator forces all eight into distinct physical banks.</p>
+<p>The automatic allocator was effectively using four of the eight PSUM banks. Allocating an 8-deep accumulator explicitly forces all eight into distinct physical banks.</p>
 
-  <div class="code">
-    <div class="bar"><i class="a"></i><i class="b"></i><i class="c"></i><span class="label">8-bank residency</span></div>
-<pre><code>acc_buf = nl.<span class="tok-f">ndarray</span>(
-    (<span class="tok-n">8</span>, nl.<span class="tok-f">par_dim</span>(TILE_CO), ROW_BLOCK, out_width),
+<pre><code>acc_buf = nl.ndarray(
+    (8, nl.par_dim(TILE_CO), ROW_BLOCK, out_width),
     dtype=nl.float32,
-    buffer=ncc.psum.<span class="tok-f">mod_alloc</span>(base_bank=<span class="tok-n">0</span>, num_bank_tiles=(<span class="tok-n">8</span>,)),
+    buffer=ncc.psum.mod_alloc(base_bank=0, num_bank_tiles=(8,)),
 )</code></pre>
-  </div>
 
-  <p>With eight accumulators live, the next eight <code>nc_matmul</code>s issue back-to-back without bank stalls, and the drain of one accumulator (a vector op plus a DMA store) overlaps with the matmul feeding the next. That's the difference between a pipeline with bubbles and one without. Asking for sixteen banks confirmed the ceiling: <code>NCC_INLA001 — out of bound PSUM8</code>.</p>
+<p>With eight accumulators live, the next eight <code>nc_matmul</code>s issue back-to-back without bank stalls, and the drain of one accumulator (a vector op plus a DMA store) overlaps with the matmul feeding the next, so the pipeline doesn't bubble. Asking for sixteen banks confirmed the ceiling: <code>NCC_INLA001 — out of bound PSUM8</code>.</p>
 
-  <h3>Octet X reuse, and an 18-row super-tile</h3>
+<h3>Octet X reuse, and an 18-row super-tile</h3>
 
-  <p>When both output-channel tiles share the same input, iterating output-channel-outer makes you load <code>X</code> twice. Restructuring to load <code>X</code> once per "octet" of eight blocks and letting both OC passes reuse it cuts those DMAs in half. For the 66×66 case I could also fuse the loads for two adjacent row-blocks into one 18-row super-tile. I swept 10 / 18 / 34 / 66 rows; 18 (exactly <code>2 × ROW_BLOCK</code>) was the sweet spot, overlapping each DMA with several matmuls instead of blocking the stream on one big load.</p>
+<p>When both output-channel tiles share the same input, iterating output-channel-outer loads <code>X</code> twice. Loading <code>X</code> once per group of eight blocks and letting both OC passes reuse it cuts those DMAs in half. For the 66×66 case I could also fuse the loads for two adjacent row-blocks into one 18-row super-tile. I swept 10 / 18 / 34 / 66 rows; 18 (exactly <code>2 × ROW_BLOCK</code>) was best, since it overlaps each DMA with several matmuls instead of blocking on one large load.</p>
 
-  <h2>Spending the error budget</h2>
+<h2>Trading precision for speed</h2>
 
-  <p>The last real lever was precision. The matmul cost on NeuronCore-v2 is simple:</p>
+<p>The last thing left was precision. The matmul cost on NeuronCore-v2 is simple:</p>
 
-  <div class="code">
-    <div class="bar"><i class="a"></i><i class="b"></i><i class="c"></i><span class="label">cycles per nc_matmul</span></div>
 <pre><code>fp32            : 4 * max(min(64, N_stat), N_moving)
 fp16/bf16/tf32  :     max(min(64, N_stat), N_moving)</code></pre>
-  </div>
 
-  <p>An fp32 matmul costs 4× a TF32 one, so every fp32 tap I can demote to TF32 saves three-quarters of that tap's cycles. The catch is correctness. The fp32 test tolerance is <code>rtol=1e-5</code>, and TF32's 10-bit mantissa introduces about 1e-3 relative error per multiply, so you don't get many taps before you blow the budget.</p>
+<p>An fp32 matmul costs 4× a TF32 one, so demoting a tap to TF32 saves three-quarters of its cycles. The catch is correctness: the fp32 tolerance is <code>rtol=1e-5</code>, and TF32's 10-bit mantissa adds about 1e-3 relative error per multiply, so you don't get many taps before blowing the budget.</p>
 
-  <p>So I treated the tolerance as a budget. A separate harness runs the kernel against PyTorch's <code>conv2d</code> across 30 RNG seeds drawn from the tester's exact input distribution, and records the worst-case ratio of observed error to allowed tolerance.</p>
+<p>I treated the tolerance as a budget. A separate harness runs the kernel against PyTorch's <code>conv2d</code> across 30 RNG seeds from the tester's input distribution and records the worst-case ratio of error to tolerance:</p>
 
-  <div class="code">
-    <div class="bar"><i class="a"></i><i class="b"></i><i class="c"></i><span class="label">stress_check.py</span></div>
-<pre><code>diff       = np.<span class="tok-f">abs</span>(Y_kernel - Y_torch)        <span class="tok-c"># per-element error</span>
-abs_budget = atol + rtol * np.<span class="tok-f">abs</span>(Y_torch)   <span class="tok-c"># per-element tolerance</span>
-rel_use    = (diff / abs_budget).<span class="tok-f">max</span>()        <span class="tok-c"># worst over all positions</span>
-<span class="tok-c"># rel_use = 1.0 means we exactly graze the ceiling at the worst pixel</span></code></pre>
-  </div>
+<pre><code>diff       = np.abs(Y_kernel - Y_torch)        # per-element error
+abs_budget = atol + rtol * np.abs(Y_torch)     # per-element tolerance
+rel_use    = (diff / abs_budget).max()         # worst over all positions
+# rel_use = 1.0 means we exactly hit the ceiling at the worst pixel</code></pre>
 
-  <p>My rule was to only accept anything over ~0.7 of budget for a sizeable win, and to reject anything grazing 1.0. A single TF32 corner tap on the fp32 3×3 case lands at 0.91, right on the edge but passing 30 seeds, so it stays. A second full TF32 tap doubles the error to ~180% and fails outright. I tested four positions for that second tap; all of them fail. One tap it is.</p>
+<p>My rule: only accept anything above ~0.7 of budget for a sizeable win, and reject anything near 1.0. A single TF32 corner tap on the fp32 3×3 case lands at 0.91 — on the edge, but it passes 30 seeds, so it stays. A second full TF32 tap doubles the error to ~180% and fails. I tested four positions for it; all fail. So one tap.</p>
 
-  <p>Case D is the interesting one, because it has two input-channel tiles. That means I can apply TF32 to <code>ci_t=0</code> only and leave the <code>ci_t=1</code> matmuls in pure fp32. Each output pixel's error then scales with how many TF32 taps hit the first tile, not the total, so the budget stretches a lot further.</p>
+<p>Case D has two input-channel tiles, so I can apply TF32 to <code>ci_t=0</code> only and leave <code>ci_t=1</code> in pure fp32. The error then scales with how many TF32 taps hit the first tile, not the total, so the budget stretches further.</p>
 
-  <div class="tbl">
-  <table>
-    <tr><th>Case D · TF32 taps (ci_t=0)</th><th class="r">budget</th><th class="r">latency</th></tr>
-    <tr><td>0 taps — pure fp32</td><td class="r">5%</td><td class="r">285 µs</td></tr>
-    <tr><td>1 tap (0,0)</td><td class="r">51%</td><td class="r">275 µs</td></tr>
-    <tr><td>2 taps + (2,2)</td><td class="r">66%</td><td class="r">265 µs</td></tr>
-    <tr><td>3 taps + (1,1)</td><td class="r">81%</td><td class="r">255 µs</td></tr>
-    <tr><td>4 taps + (0,2)</td><td class="r"><span class="big">93%</span></td><td class="r"><span class="big">245 µs</span></td></tr>
-  </table>
-  </div>
+<table>
+  <tr><th>Case D · TF32 taps (ci_t=0)</th><th class="r">budget</th><th class="r">latency</th></tr>
+  <tr><td>0 taps — pure fp32</td><td class="r">5%</td><td class="r">285 µs</td></tr>
+  <tr><td>1 tap (0,0)</td><td class="r">51%</td><td class="r">275 µs</td></tr>
+  <tr><td>2 taps + (2,2)</td><td class="r">66%</td><td class="r">265 µs</td></tr>
+  <tr><td>3 taps + (1,1)</td><td class="r">81%</td><td class="r">255 µs</td></tr>
+  <tr><td>4 taps + (0,2)</td><td class="r">93%</td><td class="r">245 µs</td></tr>
+</table>
 
-  <p>Each tap is worth about 10µs. A fifth would cross 100% on at least one seed, so I stopped at four. The X-side cast had its own wrinkle: caching all eight batches in TF32 overflowed SBUF by 832 bytes, so I used a single 2KB shared buffer that gets overwritten per batch, since the Tensor Engine consumes it right after each cast anyway.</p>
+<p>Each tap is worth about 10µs. A fifth crosses 100% on at least one seed, so I stopped at four. The X-side cast had a wrinkle: caching all eight batches in TF32 overflowed SBUF by 832 bytes, so I used a single 2KB shared buffer overwritten per batch, since the Tensor Engine consumes it right after each cast.</p>
 
-  <div class="code">
-    <div class="bar"><i class="a"></i><i class="b"></i><i class="c"></i><span class="label">shared TF32 scratch</span></div>
-<pre><code>x_tf32 = nl.<span class="tok-f">ndarray</span>((nl.<span class="tok-f">par_dim</span>(TILE_CI), ROW_BLOCK, out_width),
+<pre><code>x_tf32 = nl.ndarray((nl.par_dim(TILE_CI), ROW_BLOCK, out_width),
                   dtype=nl.tfloat32, buffer=nl.sbuf)
-<span class="tok-k">for</span> s <span class="tok-k">in</span> nl.<span class="tok-f">static_range</span>(<span class="tok-n">8</span>):
-    x_tf32[...] = nisa.<span class="tok-f">tensor_copy</span>(bigs[s][v_c, kh + v_r, v_w + kw], dtype=nl.tfloat32)
-    acc_buf[s] += nisa.<span class="tok-f">nc_matmul</span>(Wt_tf32, x_tf32)   <span class="tok-c"># consumed before next overwrite</span></code></pre>
-  </div>
+for s in nl.static_range(8):
+    x_tf32[...] = nisa.tensor_copy(bigs[s][v_c, kh + v_r, v_w + kw], dtype=nl.tfloat32)
+    acc_buf[s] += nisa.nc_matmul(Wt_tf32, x_tf32)   # consumed before next overwrite</code></pre>
 
-  <p>This is what took the mean score from 1.8361 to 1.8392.</p>
+<p>This took the mean score from 1.8361 to 1.8392.</p>
 
-  <h2>Where it landed</h2>
+<h2>Final results</h2>
 
-  <p>Every fp32-tolerance trick is gated behind an exact shape match, so unknown shapes fall through to a pure-fp32 path and stay correct. Per-case, at the final commit:</p>
+<p>Every fp32-tolerance trick is gated behind an exact shape match, so unknown shapes fall through to a pure-fp32 path and stay correct. Per-case at the final commit:</p>
 
-  <div class="tbl">
-  <table>
-    <tr><th>Case</th><th class="r">µs</th><th class="r">thr.</th><th class="r">score</th></tr>
-    <tr><td>in128_out128 3×3 b16 66² fp16</td><td class="r">264</td><td class="r">1500</td><td class="r">1.824</td></tr>
-    <tr><td>in128_out128 5×5 b16 36² fp16</td><td class="r">195</td><td class="r">1700</td><td class="r">1.885</td></tr>
-    <tr><td>in128_out256 3×3 b4  34² fp32</td><td class="r">143</td><td class="r">590</td><td class="r">1.758</td></tr>
-    <tr><td>in128_out256 3×3 b4  66² fp16</td><td class="r">145</td><td class="r">700</td><td class="r">1.793</td></tr>
-    <tr><td>in128_out256 3×3 b16 34² fp32</td><td class="r">474</td><td class="r">2000</td><td class="r">1.763</td></tr>
-    <tr><td>in128_out256 5×5 b4  36² fp32</td><td class="r">321</td><td class="r">1700</td><td class="r">1.811</td></tr>
-    <tr><td>in128_out256 5×5 b16 36² fp16</td><td class="r">371</td><td class="r">3100</td><td class="r">1.880</td></tr>
-    <tr><td>in256_out256 3×3 b4  34² fp32</td><td class="r">245</td><td class="r">1200</td><td class="r">1.796</td></tr>
-    <tr><td>in256_out256 3×3 b16 34² fp16</td><td class="r">275</td><td class="r">2700</td><td class="r">1.898</td></tr>
-    <tr><td>in256_out256 5×5 b4  36² fp16</td><td class="r">218</td><td class="r">2500</td><td class="r">1.913</td></tr>
-    <tr><td>in256_out256 5×5 b16 36² fp16</td><td class="r">720</td><td class="r">8000</td><td class="r">1.910</td></tr>
-  </table>
-  </div>
+<table>
+  <tr><th>Case</th><th class="r">µs</th><th class="r">thr.</th><th class="r">score</th></tr>
+  <tr><td>in128_out128 3×3 b16 66² fp16</td><td class="r">264</td><td class="r">1500</td><td class="r">1.824</td></tr>
+  <tr><td>in128_out128 5×5 b16 36² fp16</td><td class="r">195</td><td class="r">1700</td><td class="r">1.885</td></tr>
+  <tr><td>in128_out256 3×3 b4  34² fp32</td><td class="r">143</td><td class="r">590</td><td class="r">1.758</td></tr>
+  <tr><td>in128_out256 3×3 b4  66² fp16</td><td class="r">145</td><td class="r">700</td><td class="r">1.793</td></tr>
+  <tr><td>in128_out256 3×3 b16 34² fp32</td><td class="r">474</td><td class="r">2000</td><td class="r">1.763</td></tr>
+  <tr><td>in128_out256 5×5 b4  36² fp32</td><td class="r">321</td><td class="r">1700</td><td class="r">1.811</td></tr>
+  <tr><td>in128_out256 5×5 b16 36² fp16</td><td class="r">371</td><td class="r">3100</td><td class="r">1.880</td></tr>
+  <tr><td>in256_out256 3×3 b4  34² fp32</td><td class="r">245</td><td class="r">1200</td><td class="r">1.796</td></tr>
+  <tr><td>in256_out256 3×3 b16 34² fp16</td><td class="r">275</td><td class="r">2700</td><td class="r">1.898</td></tr>
+  <tr><td>in256_out256 5×5 b4  36² fp16</td><td class="r">218</td><td class="r">2500</td><td class="r">1.913</td></tr>
+  <tr><td>in256_out256 5×5 b16 36² fp16</td><td class="r">720</td><td class="r">8000</td><td class="r">1.910</td></tr>
+</table>
 
-  <p>For the big 720µs 5×5 case, a cycle-floor estimate puts the matmul math alone at ~547µs, so most of the wall time is unavoidable. For the small 143µs fp32 case the matmul floor is ~112µs and there's only ~31µs of overhead left to chase, which is exactly why precision was the only lever left.</p>
+<p>For the 720µs 5×5 case, the matmul math alone is about 547µs, so most of the time is unavoidable. For the 143µs fp32 case the matmul floor is about 112µs, leaving only ~31µs of overhead — which is why precision was the only lever left there.</p>
 
-  <h2>Stuff that didn't work</h2>
+<h2>Stuff that didn't work</h2>
 
-  <ul>
-    <li><strong>Mixed-dtype matmul</strong> (TF32 weights, fp32 input), rejected with <code>NCC_IBIR034</code>. Both operands must share precision, which is why a TF32 tap means casting both sides.</li>
-    <li><strong>PE tiling</strong>, splitting the 128-row stationary matrix into two 64-row tiles. Cost is bound by <code>max(…, N_moving)</code>, so splitting the stationary dimension buys nothing when the moving dimension is full-size. It cost +150µs.</li>
-    <li><strong>Multi-core SPMD</strong>. <code>kernel[nl.nc(2)](...)</code> fails on trn1 with "SPMD grid with multi neuron cores is not supported." That's a trn2 feature.</li>
-    <li><strong>Tuning instruction order</strong>. Block-order, drain-order and tap-order sweeps were all ±2µs noise, because <code>skip_middle_end_transformations</code> schedules matmuls from the dependency graph, not source order.</li>
-    <li><strong>An 8th TF32 tap on the 5×5 case</strong>, which passed stress at 97% of budget. Technically a pass, but 97% across 30 seeds is the kind of thing that fails on seed 31, so I capped it at 7.</li>
-  </ul>
+<ul>
+  <li><strong>Mixed-dtype matmul</strong> (TF32 weights, fp32 input), rejected with <code>NCC_IBIR034</code>. Both operands must share precision, which is why a TF32 tap means casting both sides.</li>
+  <li><strong>PE tiling</strong>, splitting the 128-row stationary matrix into two 64-row tiles. Cost is bound by <code>max(…, N_moving)</code>, so splitting the stationary dimension does nothing when the moving dimension is full-size. It cost +150µs.</li>
+  <li><strong>Multi-core SPMD</strong>. <code>kernel[nl.nc(2)](...)</code> fails on trn1 with "SPMD grid with multi neuron cores is not supported." It's a trn2 feature.</li>
+  <li><strong>Tuning instruction order</strong>. Block-order, drain-order and tap-order sweeps were all ±2µs noise, because <code>skip_middle_end_transformations</code> schedules matmuls from the dependency graph, not source order.</li>
+  <li><strong>An 8th TF32 tap on the 5×5 case</strong>, which passed stress at 97% of budget. Technically a pass, but 97% across 30 seeds is the kind of thing that fails on seed 31, so I capped it at 7.</li>
+</ul>
 
-  <div class="foot">
-    Trainium 1 · NeuronCore-v2 · neuronxcc.nki &nbsp;·&nbsp; <a href="/">home</a>
-  </div>
-
-</article>
-</div>
+<div class="foot">Trainium 1 · NeuronCore-v2 · neuronxcc.nki &nbsp;·&nbsp; <a href="/">home</a></div>
 
 <script>
 (function(){
-  var art = document.querySelector('article');
-  if(!art) return;
-  var text = art.innerText || art.textContent || '';
+  var text = document.body.innerText || '';
   var words = text.trim().split(/\s+/).length;
   var mins = Math.max(1, Math.round(words / 200));
   var rt = document.getElementById('readtime');
