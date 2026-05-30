@@ -56,7 +56,7 @@
 
 <p>The target is a single AWS Trainium 1 chip: one NeuronCore-v2, with a 128×128 systolic Tensor Engine. The job is a 2D convolution written in <a href="https://awsdocs-neuron.readthedocs-hosted.com/en/latest/general/nki/">NKI</a>, AWS's low-level kernel language for Neuron hardware. There's a leaderboard: each test case has a latency threshold, your score is how far under it you land, and there are eleven visible shapes — a mix of <code>float16</code> and <code>float32</code>, filters of 3×3 and 5×5, batch 4 and 16.</p>
 
-<p>I started at a baseline of 4360µs summed across the fleet, with a mean score of 1.7892. The leaderboard top was 1.8427. I ended at 3371µs and 1.8392, which is 989µs shaved and about 93% of the gap closed. Here is what I changed, in two parts: a first round of optimizations that reached a local optimum, then a rewrite plus a precision trick that got past it.</p>
+<p>I ended at 3371µs total across all testcases, which was an average speedup of ~5x across the tests. Here is what I changed, in two parts: a first round of optimizations that reached a local optimum, then a weight-hoisting rewrite plus a bit of precision magic :)</p>
 
 <h2>Hardware constraints I focused on</h2>
 
